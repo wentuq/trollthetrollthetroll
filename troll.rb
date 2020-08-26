@@ -7,8 +7,25 @@ $troll_login       = ENV['TROLLTHETROLL_LOGIN']
 $troll_password    = ENV['TROLLTHETROLL_PASSWORD']
 $troll_url_main = "https://trollthetroll.net/"
 
-$browser = Watir::Browser.new :firefox, headless: true
-$browser.goto $troll_url_main
+$browser = nil
+
+
+def browser_init
+ $browser = Watir::Browser.start $troll_url_main, :firefox, headless: true
+end
+
+def run_browser
+    unless $browser
+        browser_init()
+    end
+    unless $browser.exists?
+        browser_init()
+    end
+end
+
+def close_browser
+    $browser.close
+end
 
 def login
     login_link = $browser.link text: "Log in"
@@ -20,15 +37,20 @@ def login
     end
 end
 
+
+
 def timer
+    # return how long should we sleep
+    how_long_sleep = 0
     timer = $browser.div(id: 'timer')
     if timer.exists?
         timer_value = timer.child.text
         next_cookie_time = parse_countdown(timer_value)
         wait_extra = rand(30..120)
         puts "Next cookie will be in #{next_cookie_time}seconds but we will wait extra #{wait_extra}sec"
-        sleep (next_cookie_time + wait_extra)
+        how_long_sleep = next_cookie_time + wait_extra
     end
+    return how_long_sleep
 end
 
 def solve
@@ -55,11 +77,17 @@ def parse_countdown(text)
     return total
 end
 
-# TODO: Best option will be to login first, save browser cookies to remember session
-# TODO: if times counts, switch off  the browser to save resources and then wake up again,
-# TODO: switch on browser steal cookie(real cookie) and start again.
+# TODO: Best option will be to login first and save browser session
+# TODO: Currently, every time we open browser, we need to log in
+run_browser()
 login()
 while(true)
-    timer()
+    how_long_sleep = timer()
+    if how_long_sleep > 0
+        close_browser()
+        sleep(how_long_sleep)
+        run_browser()
+    end
+    login()
     solve()
 end
